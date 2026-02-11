@@ -1,0 +1,24 @@
+{
+  "name": "stifler",
+  "module": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "stifler": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "dev": "bun --watch run src/index.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
+    "chalk": "^5.4.1",
+    "ora": "^8.2.0",
+    "marked": "^15.0.0",
+    "marked-terminal": "^7.3.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.4.0"
+  }
+}
