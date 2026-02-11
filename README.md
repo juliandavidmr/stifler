@@ -56,6 +56,57 @@ bun run dev
 
 On first run, you'll be prompted for your Anthropic API key. You can also set it via the `ANTHROPIC_API_KEY` environment variable.
 
+## Example Session
+
+```
+╭─────────────────────────────────────────────────╮
+│  Stifler v0.1.0                                 │
+│  Model: claude-sonnet-4-20250514                │
+│  Tools: filesystem, memory, reminders | MCPs: none│
+╰─────────────────────────────────────────────────╯
+
+> Remember that our prod deploy command is: fly deploy --app stifler-prod --region mia
+
+[tool] memory_store
+  ✓ Memory stored with ID: 019c4e...
+
+Got it, I'll remember your production deploy command.
+
+> Remind me 5 minutes before my 12pm meeting with Carlos about the 2FA TRD
+
+[tool] reminder_create
+  ✓ Reminder created (019c4ec3...) for 2/11/2026, 11:55:00 AM: "Meeting with Carlos about 2FA TRD in 5 minutes"
+
+Done! You'll get a notification at 11:55 AM.
+
+> Read ~/projects/api/src/auth.ts and tell me if there's already a 2FA flow
+
+[tool] fs_read_file
+  ✓ (file contents)
+
+The file has a basic password auth flow but no 2FA implementation yet.
+There's a `verifyCredentials()` function that only checks email + password.
+You'd need to add a TOTP verification step after the initial login succeeds.
+
+> /remind list
+
+Pending reminders:
+
+  (019c4ec3...) Meeting with Carlos about 2FA TRD in 5 minutes → 2/11/2026, 11:55:00 AM
+
+> /daemon
+
+Daemon status:
+
+  Status:         running
+  Poller jobs:    1
+  Reminder jobs:  1
+  Model:          claude-haiku-4-5-20250929
+  Quiet hours:    22:00 - 8:00
+```
+
+_At 11:55 AM, a macOS notification pops up:_ **Reminder** — Meeting with Carlos about 2FA TRD in 5 minutes
+
 ## CLI Commands
 
 | Command                     | Description                 |
