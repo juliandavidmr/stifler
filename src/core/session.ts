@@ -4,22 +4,26 @@ import {
   getRecentMessages,
   clearMessages,
   getMessageCount,
-} from '../db/repositories/messages.repo.ts';
-import type { ChatMessage } from '../types/memory.ts';
+} from "../db/repositories/messages.repo.ts";
+import type { ChatMessage } from "../types/memory.ts";
 
 const MAX_MESSAGES = 100;
 
 export function addUserMessage(content: string): void {
-  saveMessage({ role: 'user', content });
+  saveMessage({ role: "user", content });
 }
 
 export function addAssistantMessage(content: string): void {
-  saveMessage({ role: 'assistant', content });
+  saveMessage({ role: "assistant", content });
 }
 
-export function addToolUseMessage(toolUseId: string, toolName: string, toolInput: Record<string, unknown>): void {
+export function addToolUseMessage(
+  toolUseId: string,
+  toolName: string,
+  toolInput: Record<string, unknown>,
+): void {
   saveMessage({
-    role: 'tool_use',
+    role: "tool_use",
     toolUseId,
     toolName,
     toolInput,
@@ -28,7 +32,7 @@ export function addToolUseMessage(toolUseId: string, toolName: string, toolInput
 
 export function addToolResultMessage(toolUseId: string, content: string): void {
   saveMessage({
-    role: 'tool_result',
+    role: "tool_result",
     content,
     toolUseId,
   });
@@ -44,8 +48,4 @@ export function getSessionMessages(): ChatMessage[] {
 
 export function clearSession(): void {
   clearMessages();
-}
-
-export function getSessionMessageCount(): number {
-  return getMessageCount();
 }

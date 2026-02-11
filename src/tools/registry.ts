@@ -1,13 +1,22 @@
-import { filesystemGroup } from './native/index.ts';
-import { memoryGroup } from './memory/index.ts';
-import type { ToolGroup, ToolDefinition, ToolHandler, ToolGroupDefinition } from '../types/tools.ts';
+import { filesystemGroup } from "./native/index.ts";
+import { memoryGroup } from "./memory/index.ts";
+import { remindersGroup } from "./reminders/index.ts";
+import {
+  ToolGroup,
+  type ToolDefinition,
+  type ToolHandler,
+  type ToolGroupDefinition,
+} from "../types/tools.ts";
 
 const groups: Record<ToolGroup, ToolGroupDefinition> = {
-  filesystem: filesystemGroup,
-  memory: memoryGroup,
+  [ToolGroup.FILESYSTEM]: filesystemGroup,
+  [ToolGroup.MEMORY]: memoryGroup,
+  [ToolGroup.REMINDERS]: remindersGroup,
 };
 
-export function getToolDefinitions(activeGroups: ToolGroup[]): ToolDefinition[] {
+export function getToolDefinitions(
+  activeGroups: ToolGroup[],
+): ToolDefinition[] {
   const tools: ToolDefinition[] = [];
   for (const group of activeGroups) {
     const g = groups[group];
@@ -29,10 +38,6 @@ export function getToolHandler(toolName: string): ToolHandler | null {
 
 export function getAllGroups(): ToolGroupDefinition[] {
   return Object.values(groups);
-}
-
-export function getGroup(name: ToolGroup): ToolGroupDefinition | undefined {
-  return groups[name];
 }
 
 export function isNativeTool(toolName: string): boolean {

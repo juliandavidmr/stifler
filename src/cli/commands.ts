@@ -20,17 +20,32 @@ import {
   storeMemory,
   removeMemory,
 } from "../memory/manager.ts";
-import { clearSession, getSessionMessageCount } from "../core/session.ts";
+import { clearSession } from "../core/session.ts";
 import {
   formatHelpCommand,
   formatError,
   formatSuccess,
   formatWarning,
 } from "./formatter.ts";
-import { prompt, promptSecret } from "./prompts.ts";
+import { prompt } from "./prompts.ts";
 import { writeFileSync } from "fs";
 import { getMessages } from "../db/repositories/messages.repo.ts";
-import type { ToolGroup } from "../types/tools.ts";
+import { ToolGroup } from "../types/tools.ts";
+import {
+  startDaemon,
+  stopDaemon,
+  pauseDaemon,
+  resumeDaemon,
+  getDaemonStatus,
+} from "../daemon/index.ts";
+import {
+  addReminder,
+  listPendingReminders,
+  removeReminder,
+} from "../daemon/reminders/manager.ts";
+import { scheduleReminder } from "../daemon/reminders/scheduler.ts";
+import { getRecentNotifications } from "../db/repositories/notifications.repo.ts";
+import { getDaemonConfig } from "../daemon/config.ts";
 
 export async function handleCommand(input: string): Promise<boolean> {
   const parts = input.trim().split(/\s+/);
@@ -66,6 +81,18 @@ export async function handleCommand(input: string): Promise<boolean> {
 
     case "/export":
       await handleExport();
+      return true;
+
+    case "/daemon":
+      await handleDaemon(parts.slice(1));
+      return true;
+
+    case "/remind":
+      await handleRemind(parts.slice(1), input);
+      return true;
+
+    case "/notifications":
+      handleNotifications();
       return true;
 
     case "/exit":
@@ -107,6 +134,13 @@ function showHelp(): void {
   console.log(formatHelpCommand("/memory delete <id>", "Delete a memory"));
   console.log(formatHelpCommand("/clear", "Clear chat history"));
   console.log(formatHelpCommand("/export", "Export history to file"));
+  console.log(formatHelpCommand("/daemon", "Show daemon status"));
+  console.log(formatHelpCommand("/daemon pause", "Pause the daemon"));
+  console.log(formatHelpCommand("/daemon resume", "Resume the daemon"));
+  console.log(formatHelpCommand("/remind <text> <when>", "Create a reminder"));
+  console.log(formatHelpCommand("/remind list", "List pending reminders"));
+  console.log(formatHelpCommand("/remind delete <id>", "Delete a reminder"));
+  console.log(formatHelpCommand("/notifications", "Show recent notifications"));
   console.log(formatHelpCommand("/exit, /quit", "Exit the application"));
   console.log("");
 }
@@ -198,12 +232,16 @@ async function handleTools(args: string[]): Promise<void> {
   const groupName = args[1] as ToolGroup | undefined;
 
   if (!groupName) {
-    console.log(formatError("Specify a group: filesystem, memory"));
+    console.log(formatError("Specify a group: filesystem, memory, reminders"));
     return;
   }
 
   const config = getConfig();
-  const validGroups: ToolGroup[] = ["filesystem", "memory"];
+  const validGroups: ToolGroup[] = [
+    ToolGroup.FILESYSTEM,
+    ToolGroup.MEMORY,
+    ToolGroup.REMINDERS,
+  ];
 
   if (!validGroups.includes(groupName)) {
     console.log(
@@ -352,6 +390,174 @@ async function handleMemory(args: string[]): Promise<void> {
   }
 
   console.log(formatError("Usage: /memory, /memory add, /memory delete <id>"));
+}
+
+async function handleDaemon(args: string[]): Promise<void> {
+  if (args.length === 0) {
+    const status = getDaemonStatus();
+    const config = getDaemonConfig();
+    console.log("");
+    console.log(chalk.bold("Daemon status:"));
+    console.log("");
+    console.log(
+      `  ${chalk.dim("Status:")}         ${status.running ? (status.paused ? chalk.yellow("paused") : chalk.green("running")) : chalk.dim("stopped")}`,
+    );
+    console.log(`  ${chalk.dim("Poller jobs:")}    ${status.pollerJobs}`);
+    console.log(`  ${chalk.dim("Reminder jobs:")}  ${status.reminderJobs}`);
+    console.log(`  ${chalk.dim("Model:")}          ${config.model}`);
+    console.log(
+      `  ${chalk.dim("Quiet hours:")}    ${config.quietHoursStart}:00 - ${config.quietHoursEnd}:00`,
+    );
+    console.log("");
+    return;
+  }
+
+  const action = args[0];
+  if (action === "pause") {
+    pauseDaemon();
+    console.log(formatSuccess("Daemon paused."));
+  } else if (action === "resume") {
+    resumeDaemon();
+    console.log(formatSuccess("Daemon resumed."));
+  } else if (action === "start") {
+    startDaemon();
+    console.log(formatSuccess("Daemon started."));
+  } else if (action === "stop") {
+    stopDaemon();
+    console.log(formatSuccess("Daemon stopped."));
+  } else {
+    console.log(formatError("Usage: /daemon, /daemon pause, /daemon resume"));
+  }
+}
+
+async function handleRemind(args: string[], rawInput: string): Promise<void> {
+  if (args.length === 0) {
+    console.log(
+      formatError(
+        'Usage: /remind "text" <when>, /remind list, /remind delete <id>',
+      ),
+    );
+    return;
+  }
+
+  if (args[0] === "list") {
+    const reminders = listPendingReminders();
+    console.log("");
+    console.log(chalk.bold("Pending reminders:"));
+    console.log("");
+    if (reminders.length === 0) {
+      console.log(chalk.dim("  No pending reminders."));
+    } else {
+      for (const r of reminders) {
+        const date = new Date(r.remindAt).toLocaleString();
+        const recurrent = r.cronPattern ? chalk.dim(" (recurrent)") : "";
+        console.log(
+          `  ${chalk.dim(`(${r.id.substring(0, 8)}...)`)} ${r.content} ${chalk.cyan(`→ ${date}`)}${recurrent}`,
+        );
+      }
+    }
+    console.log("");
+    return;
+  }
+
+  if (args[0] === "delete" && args[1]) {
+    const deleted = removeReminder(args[1]);
+    if (deleted) {
+      console.log(formatSuccess("Reminder deleted."));
+    } else {
+      console.log(formatError(`Reminder not found: ${args[1]}`));
+    }
+    return;
+  }
+
+  // Parse: /remind "text" <when>
+  const afterCommand = rawInput.replace(/^\/remind\s+/, "");
+  const quoteMatch = afterCommand.match(/^"([^"]+)"\s+(.+)$/);
+
+  let content: string;
+  let whenStr: string;
+
+  if (quoteMatch) {
+    content = quoteMatch[1]!;
+    whenStr = quoteMatch[2]!;
+  } else {
+    // Fallback: last word(s) that look like time, rest is content
+    // Try splitting at common time indicators
+    const timeIndicators = [
+      "in ",
+      "tomorrow",
+      "today",
+      "monday",
+      "tuesday",
+      "wednesday",
+      "thursday",
+      "friday",
+      "saturday",
+      "sunday",
+    ];
+    let splitIdx = -1;
+    for (const indicator of timeIndicators) {
+      const idx = afterCommand.toLowerCase().lastIndexOf(indicator);
+      if (idx > 0) {
+        splitIdx = idx;
+        break;
+      }
+    }
+
+    // Try relative patterns at end: 5min, 2h, etc.
+    const relMatch = afterCommand.match(
+      /\s+(\d+\s*(?:m|min|mins|minutes?|h|hrs?|hours?|s|secs?|seconds?))$/i,
+    );
+    if (relMatch) {
+      splitIdx = afterCommand.length - relMatch[0].length;
+    }
+
+    if (splitIdx > 0) {
+      content = afterCommand.substring(0, splitIdx).trim();
+      whenStr = afterCommand.substring(splitIdx).trim();
+    } else {
+      console.log(
+        formatError(
+          'Could not parse reminder. Use: /remind "text" <when>\nExamples: /remind "Check PR" tomorrow 3pm, /remind "Standup" in 30min',
+        ),
+      );
+      return;
+    }
+  }
+
+  const reminder = addReminder(content, whenStr);
+  if (!reminder) {
+    console.log(
+      formatError(
+        `Could not parse time: "${whenStr}". Examples: 5min, 2h, tomorrow 3pm, monday 9am, every day 9am`,
+      ),
+    );
+    return;
+  }
+
+  scheduleReminder(reminder.id, reminder.remindAt, reminder.content);
+  const dateStr = new Date(reminder.remindAt).toLocaleString();
+  const recurrent = reminder.cronPattern ? " (recurrent)" : "";
+  console.log(formatSuccess(`Reminder set for ${dateStr}${recurrent}`));
+}
+
+function handleNotifications(): void {
+  const notifications = getRecentNotifications(20);
+  console.log("");
+  console.log(chalk.bold("Recent notifications:"));
+  console.log("");
+  if (notifications.length === 0) {
+    console.log(chalk.dim("  No notifications yet."));
+  } else {
+    for (const n of notifications) {
+      const date = new Date(n.sentAt).toLocaleString();
+      const src = chalk.dim(`[${n.source}]`);
+      console.log(
+        `  ${chalk.dim(date)} ${src} ${chalk.white(n.title)}: ${n.body}`,
+      );
+    }
+  }
+  console.log("");
 }
 
 async function handleExport(): Promise<void> {

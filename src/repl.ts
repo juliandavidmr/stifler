@@ -9,6 +9,7 @@ import {
 } from "./cli/formatter.ts";
 import { getConfig } from "./config/manager.ts";
 import { getActiveMcpConfigs } from "./mcp/manager.ts";
+import { startDaemon, stopDaemon } from "./daemon/index.ts";
 
 function askQuestion(
   rl: ReturnType<typeof createInterface>,
@@ -41,7 +42,10 @@ export async function startRepl(): Promise<void> {
     terminal: true,
   });
 
+  startDaemon();
+
   rl.on("close", () => {
+    stopDaemon();
     console.log(chalk.dim("\nGoodbye!"));
     process.exit(0);
   });

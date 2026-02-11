@@ -17,14 +17,6 @@ export function formatAssistantMessage(text: string): string {
   }
 }
 
-export function formatToolUse(toolName: string, target?: string): string {
-  const parts = [chalk.cyan("[tool]"), chalk.white(toolName)];
-  if (target) {
-    parts.push(chalk.dim("→"), chalk.dim(target));
-  }
-  return parts.join(" ");
-}
-
 export function formatError(message: string): string {
   return chalk.red(`✗ ${message}`);
 }

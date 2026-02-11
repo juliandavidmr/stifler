@@ -11,11 +11,12 @@
     "dev": "bun --watch run src/index.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.52.0",
+    "@anthropic-ai/sdk": "^0.74.0",
     "chalk": "^5.4.1",
-    "ora": "^8.2.0",
-    "marked": "^15.0.0",
-    "marked-terminal": "^7.3.0"
+    "croner": "^10.0.1",
+    "marked": "^17.0.2",
+    "marked-terminal": "^7.3.0",
+    "ora": "^9.3.0"
   },
   "devDependencies": {
     "@types/bun": "latest",

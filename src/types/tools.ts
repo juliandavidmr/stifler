@@ -1,4 +1,8 @@
-export type ToolGroup = "filesystem" | "memory";
+export enum ToolGroup {
+  FILESYSTEM = "filesystem",
+  MEMORY = "memory",
+  REMINDERS = "reminders",
+}
 
 export interface AppConfig {
   anthropicApiKey: string;

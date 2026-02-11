@@ -35,7 +35,37 @@ CREATE TABLE IF NOT EXISTS mcp_connections (
   created_at INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS seen_items (
+  id TEXT PRIMARY KEY,
+  source TEXT NOT NULL CHECK(source IN ('calendar', 'gmail', 'memory')),
+  source_id TEXT NOT NULL,
+  first_seen_at INTEGER NOT NULL,
+  was_relevant INTEGER DEFAULT 0,
+  notified_at INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS notifications_log (
+  id TEXT PRIMARY KEY,
+  source TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  sent_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS reminders (
+  id TEXT PRIMARY KEY,
+  content TEXT NOT NULL,
+  remind_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  fired INTEGER DEFAULT 0,
+  cron_pattern TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
 CREATE INDEX IF NOT EXISTS idx_memories_active ON memories(is_active);
 CREATE INDEX IF NOT EXISTS idx_memories_importance ON memories(importance);
+CREATE INDEX IF NOT EXISTS idx_seen_items_source ON seen_items(source);
+CREATE INDEX IF NOT EXISTS idx_reminders_fired ON reminders(fired);
+CREATE INDEX IF NOT EXISTS idx_reminders_remind_at ON reminders(remind_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_sent_at ON notifications_log(sent_at);
 `;

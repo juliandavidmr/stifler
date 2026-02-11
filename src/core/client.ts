@@ -13,6 +13,7 @@ import {
   addToolResultMessage,
 } from "./session.ts";
 import chalk from "chalk";
+import { ToolGroup } from "../types/tools.ts";
 
 const spinnerFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
@@ -68,12 +69,12 @@ function buildSystemPrompt(): string {
 
   const capabilities: string[] = [];
 
-  if (config.activeToolGroups.includes("filesystem")) {
+  if (config.activeToolGroups.includes(ToolGroup.FILESYSTEM)) {
     capabilities.push(
       "- You can read, write, and manipulate files in the user's allowed paths.",
     );
   }
-  if (config.activeToolGroups.includes("memory")) {
+  if (config.activeToolGroups.includes(ToolGroup.MEMORY)) {
     capabilities.push(
       "- You can store and retrieve persistent memories about the user.",
     );
@@ -172,6 +173,12 @@ export async function sendMessage(
           const resultContent = result.success
             ? result.output
             : `Error: ${result.output}`;
+
+          if (result.success && result.output) {
+            console.log(chalk.green(`  ✓ ${result.output}`));
+          } else if (!result.success) {
+            console.log(chalk.red(`  ✗ ${result.output}`));
+          }
 
           addToolResultMessage(block.id, resultContent);
 
